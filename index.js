@@ -1,23 +1,27 @@
 // Entry point untuk Wispbyte: node /home/container/${JS_FILE}
-// JS_FILE = index.js (atau biarkan kosong; Node akan memakai index.js dari folder).
+// Catatan: panel Wispbyte mengganti teks mirip "PASSWORD=..." jadi ••• saat menyimpan,
+// jadi nama env diakses lewat variabel, bukan literal `X=`.
 const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
 const home = process.env.HOME || '/home/container';
 const port = process.env.PORT || '3000';
+const E = process.env;
+const env = { ...E };
 
-// Satu password untuk semua: cukup isi OPENCODE_PASSWORD di panel.
-// OPENCODE_SERVER_USERNAME / OPENCODE_SERVER_PASSWORD diisi otomatis kalau kosong.
-const env = { ...process.env };
-env.OPENCODE_SERVER_USERNAME ||= 'opencode';
-const password = env.OPENCODE_PASSWORD || env.OPENCODE_SERVER_PASSWORD || '';
-env.OPENCODE_PASSWORD = password;
-env.OPENCODE_SERVER_PASSWORD = password;
+const KU = 'OPENCODE_SERVER_USERNAME';
+const KP = 'OPENCODE_PASSWORD';
+const KS = 'OPENCODE_SERVER_PASSWORD';
+
+env[KU] = env[KU] || 'opencode';
+const pw = E[KP] || E[KS] || '';
+env[KP] = pw;
+env[KS] = pw;
 
 // Cari binary: yang sudah di-install, sisa node_modules lama, atau pasang sendiri.
 const candidates = [
-  env.OPENCODE_BIN,
+  E.OPENCODE_BIN,
   path.join(home, '.opencode/bin/opencode'),
   path.join(home, 'node_modules/.bin/opencode'),
   path.join(home, 'node_modules/@opencode/cli/bin/opencode.exe'),
