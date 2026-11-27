@@ -56,7 +56,7 @@ Repo ini juga punya `package.json`, jadi panel bertipe **Node.js app / Deploy fr
 
 `@opencode/cli` memasang binary native lewat postinstall; `.npmrc` di repo memastikan script tidak di-skip. Kalau platform memakai npm 12 yang memblokir script (mis. Node 26), tambahkan `--allow-scripts=@opencode/cli` pada build command, atau jalankan `node node_modules/@opencode/cli/postinstall.mjs` setelah install.
 
-Env wajib tetap seperti §2A. Untuk penyimpanan, arahkan `XDG_DATA_HOME` / `OPENCODE_DB` ke direktori persisten milik platform kalau ada — kalau tidak, sesi bisa hilang saat restart. `ripgrep` (`rg`) dipakai untuk pencarian file; image Docker sudah menyertakannya, runtime Node.js biasanya tidak.
+Env wajib tetap seperti §2A. **Node.js tidak membaca `.env` otomatis** — isi semua variable di panel hosting (file `.env` di repo hanya dipakai `docker compose`, bukan `npm start`). Untuk penyimpanan, arahkan `XDG_DATA_HOME` / `OPENCODE_DB` ke direktori persisten milik platform kalau ada — kalau tidak, sesi bisa hilang saat restart. `ripgrep` (`rg`) dipakai untuk pencarian file; image Docker sudah menyertakannya, runtime Node.js biasanya tidak.
 
 ## 2C. Deploy di VPS (tanpa Docker, lewat SSH)
 
