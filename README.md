@@ -45,7 +45,20 @@ docker compose up -d --build
 curl -u 'opencode:PASSWORD' http://127.0.0.1:4096/api/info
 ```
 
-## 2B. Deploy di VPS (tanpa Docker)
+## 2B. Deploy tanpa Docker di hosting Node.js
+
+Repo ini juga punya `package.json`, jadi panel bertipe **Node.js app / Deploy from GitHub** bisa langsung:
+
+- Build command: `npm install`
+- Start command: `npm start`
+- Node.js: `>= 20`
+- Port: env `PORT` dari platform (default `4096`)
+
+`@opencode/cli` memasang binary native lewat postinstall; `.npmrc` di repo memastikan script tidak di-skip. Kalau platform memakai npm 12 yang memblokir script (mis. Node 26), tambahkan `--allow-scripts=@opencode/cli` pada build command, atau jalankan `node node_modules/@opencode/cli/postinstall.mjs` setelah install.
+
+Env wajib tetap seperti §2A. Untuk penyimpanan, arahkan `XDG_DATA_HOME` / `OPENCODE_DB` ke direktori persisten milik platform kalau ada — kalau tidak, sesi bisa hilang saat restart. `ripgrep` (`rg`) dipakai untuk pencarian file; image Docker sudah menyertakannya, runtime Node.js biasanya tidak.
+
+## 2C. Deploy di VPS (tanpa Docker, lewat SSH)
 
 ```sh
 # user khusus service
