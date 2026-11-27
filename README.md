@@ -54,10 +54,20 @@ Repo ini sengaja **tidak punya dependency npm**. Binary OpenCode dipasang langsu
 - Startup command: biarkan default `node /home/container/${JS_FILE}`
 - `JS_FILE=index.js`
 - `PORT=3000` (atau port yang ditentukan panel)
+- `AUTO_UPDATE=1` (wajib, supaya `git pull` mengambil commit terbaru)
 - Build: tidak ada / `npm install` (aman, cepat)
 - Node.js `v19.9.0` **didukung** — `>=18`
 
-`index.js` meneruskan env ke `opencode serve --hostname 0.0.0.0 --port $PORT`. Kalau `JS_FILE` dikosongkan, Node tetap menemukan `index.js` dari folder, tapi mengisi `JS_FILE=index.js` lebih aman.
+Env minimal di panel (password cukup sekali):
+
+```env
+PORT=3000
+JS_FILE=index.js
+AUTO_UPDATE=1
+OPENCODE_PASSWORD=<password acak panjang>
+```
+
+`index.js` menyalin `OPENCODE_PASSWORD` ke `OPENCODE_SERVER_PASSWORD` dan men-set `OPENCODE_SERVER_USERNAME=opencode` otomatis, jadi tidak perlu mengisi dua password. `index.js` meneruskan env ke `opencode serve --hostname 0.0.0.0 --port $PORT`. Kalau `JS_FILE` dikosongkan, Node tetap menemukan `index.js` dari folder, tapi mengisi `JS_FILE=index.js` lebih aman.
 
 Env wajib tetap seperti §2A. **Node.js tidak membaca `.env` otomatis** — isi semua variable di panel hosting. Untuk penyimpanan, arahkan `XDG_DATA_HOME` / `OPENCODE_DB` ke direktori persisten milik platform kalau ada — kalau tidak, sesi bisa hilang saat restart. `ripgrep` (`rg`) dipakai untuk pencarian file; tidak wajib untuk menjalankan server.
 

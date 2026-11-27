@@ -7,8 +7,16 @@ const bin = process.env.OPENCODE_BIN || path.join(process.env.HOME || '/home/con
 const port = process.env.PORT || '3000';
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
 
+// Satu password untuk semua: cukup isi OPENCODE_PASSWORD di panel.
+// OPENCODE_SERVER_USERNAME / OPENCODE_SERVER_PASSWORD diisi otomatis kalau kosong.
+const env = { ...process.env };
+env.OPENCODE_SERVER_USERNAME ||= 'opencode';
+const password = env.OPENCODE_PASSWORD || env.OPENCODE_SERVER_PASSWORD || '';
+env.OPENCODE_PASSWORD = password;
+env.OPENCODE_SERVER_PASSWORD = password;
+
 console.log(`[start] ${bin} ${args.join(' ')}`);
-const child = spawn(bin, args, { stdio: 'inherit', env: process.env });
+const child = spawn(bin, args, { stdio: 'inherit', env });
 
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
   process.on(sig, () => child.kill(sig));
