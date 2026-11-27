@@ -1,0 +1,5 @@
+# Ganti domain. Caddy otomatis dapat HTTPS (Let's Encrypt).
+# Jangan expose port 4096 langsung ke internet.
+oc.example.com {
+	reverse_proxy 127.0.0.1:4096
+}

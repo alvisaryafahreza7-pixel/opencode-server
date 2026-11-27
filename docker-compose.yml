@@ -1,0 +1,12 @@
+services:
+  opencode:
+    build: .
+    image: opencode-server:local
+    restart: unless-stopped
+    # Default hanya bind di host. Kalau hosting meneruskan port publik langsung ke container,
+    # ganti HOST_BIND di .env menjadi 0.0.0.0.
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:4096:4096"
+    env_file: .env
+    volumes:
+      - ./data:/data
