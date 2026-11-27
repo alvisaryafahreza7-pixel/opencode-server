@@ -9,6 +9,10 @@ fi
 
 set -euo pipefail
 
+# Bersihkan sisa install lama (@opencode/cli + node_modules) yang bisa kena disk limit.
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+rm -rf "$ROOT/node_modules" "$ROOT/package-lock.json"
+
 BIN_DIR="$HOME/.opencode/bin"
 mkdir -p "$BIN_DIR"
 
