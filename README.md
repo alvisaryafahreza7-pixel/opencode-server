@@ -47,16 +47,21 @@ curl -u 'opencode:PASSWORD' http://127.0.0.1:4096/api/info
 
 ## 2B. Deploy tanpa Docker di hosting Node.js
 
-Repo ini juga punya `package.json`, jadi panel bertipe **Node.js app / Deploy from GitHub** bisa langsung:
+Repo ini sengaja **tidak punya dependency npm**. Binary OpenCode dipasang langsung oleh `.wispbyte/deploy.sh` lewat `curl + tar` (script instal resmi), jadi `npm install` generik Wispbyte cuma memproses file kosong → tidak OOM.
 
-- Build command: `npm install`
-- Start command: `npm start`
-- Node.js: `>= 18` (binary OpenCode native, tidak bergantung versi Node; warning EBADENGINE dari `>=20` sudah dihapus)
-- Port: **isi `PORT=3000` di panel** (atau port yang ditentukan platform). Kalau platform meng-inject `PORT` otomatis, nilai itu yang dipakai; fallback repo juga `3000`. Error `PORT undefined` saat build hampir selalu berarti env ini belum diisi.
+**Khusus Wispbyte** (panel Node.js):
 
-`@opencode/cli` memasang binary native lewat postinstall; `.npmrc` di repo memastikan script tidak di-skip. Kalau platform memakai npm 12 yang memblokir script (mis. Node 26), tambahkan `--allow-scripts=@opencode/cli` pada build command, atau jalankan `node node_modules/@opencode/cli/postinstall.mjs` setelah install.
+- Startup command: biarkan default `node /home/container/${JS_FILE}`
+- `JS_FILE=index.js`
+- `PORT=3000` (atau port yang ditentukan panel)
+- Build: tidak ada / `npm install` (aman, cepat)
+- Node.js `v19.9.0` **didukung** — `>=18`
 
-Env wajib tetap seperti §2A. **Node.js tidak membaca `.env` otomatis** — isi semua variable di panel hosting (file `.env` di repo hanya dipakai `docker compose`, bukan `npm start`). Untuk penyimpanan, arahkan `XDG_DATA_HOME` / `OPENCODE_DB` ke direktori persisten milik platform kalau ada — kalau tidak, sesi bisa hilang saat restart. `ripgrep` (`rg`) dipakai untuk pencarian file; image Docker sudah menyertakannya, runtime Node.js biasanya tidak.
+`index.js` meneruskan env ke `opencode serve --hostname 0.0.0.0 --port $PORT`. Kalau `JS_FILE` dikosongkan, Node tetap menemukan `index.js` dari folder, tapi mengisi `JS_FILE=index.js` lebih aman.
+
+Env wajib tetap seperti §2A. **Node.js tidak membaca `.env` otomatis** — isi semua variable di panel hosting. Untuk penyimpanan, arahkan `XDG_DATA_HOME` / `OPENCODE_DB` ke direktori persisten milik platform kalau ada — kalau tidak, sesi bisa hilang saat restart. `ripgrep` (`rg`) dipakai untuk pencarian file; tidak wajib untuk menjalankan server.
+
+> Catatan OOM: `npm install` dengan `@opencode/cli` + 12 paket opsional platform pernah di-`kill` (exit 137) di paket Wispbyte kecil. Itu sebabnya dependency dihapus dan pemasangan dipindah ke `deploy.sh`.
 
 ## 2C. Deploy di VPS (tanpa Docker, lewat SSH)
 
