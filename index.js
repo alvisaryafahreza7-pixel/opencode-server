@@ -5,7 +5,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const home = process.env.HOME || '/home/container';
-const bin = process.env.OPENCODE_BIN || path.join(home, '.opencode/bin/opencode');
 const port = process.env.PORT || '3000';
 
 // Satu password untuk semua: cukup isi OPENCODE_PASSWORD di panel.
@@ -16,8 +15,16 @@ const password = env.OPENCODE_PASSWORD || env.OPENCODE_SERVER_PASSWORD || '';
 env.OPENCODE_PASSWORD = password;
 env.OPENCODE_SERVER_PASSWORD = password;
 
-// Pasang binary kalau belum ada (self-contained, tidak butuh npm).
-if (!fs.existsSync(bin)) {
+// Cari binary: yang sudah di-install, sisa node_modules lama, atau pasang sendiri.
+const candidates = [
+  env.OPENCODE_BIN,
+  path.join(home, '.opencode/bin/opencode'),
+  path.join(home, 'node_modules/.bin/opencode'),
+  path.join(home, 'node_modules/@opencode/cli/bin/opencode.exe'),
+].filter(Boolean);
+
+let bin = candidates.find((p) => fs.existsSync(p));
+if (!bin) {
   console.log('[start] mengunduh OpenCode (curl+tar, tanpa npm)...');
   env.VERSION = env.VERSION || env.OPENCODE_VERSION || '2.4.2';
   const r = spawnSync(
@@ -29,6 +36,7 @@ if (!fs.existsSync(bin)) {
     console.error('[start] gagal memasang opencode');
     process.exit(1);
   }
+  bin = candidates.find((p) => fs.existsSync(p)) || path.join(home, '.opencode/bin/opencode');
 }
 
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
