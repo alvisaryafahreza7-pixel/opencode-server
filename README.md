@@ -52,7 +52,7 @@ Repo ini juga punya `package.json`, jadi panel bertipe **Node.js app / Deploy fr
 - Build command: `npm install`
 - Start command: `npm start`
 - Node.js: `>= 20`
-- Port: env `PORT` dari platform (default `4096`)
+- Port: **isi `PORT=3000` di panel** (atau port yang ditentukan platform). Kalau platform meng-inject `PORT` otomatis, nilai itu yang dipakai; fallback repo juga `3000`. Error `PORT undefined` saat build hampir selalu berarti env ini belum diisi.
 
 `@opencode/cli` memasang binary native lewat postinstall; `.npmrc` di repo memastikan script tidak di-skip. Kalau platform memakai npm 12 yang memblokir script (mis. Node 26), tambahkan `--allow-scripts=@opencode/cli` pada build command, atau jalankan `node node_modules/@opencode/cli/postinstall.mjs` setelah install.
 
