@@ -107,6 +107,68 @@ if (!bin) {
   }
 }
 
+// --- HTTPS via Cloudflare Quick Tunnel -----------------------------------
+// OpenCode Mobile menolak http://, jadi server dibuka juga lewat trycloudflare.com
+// (HTTPS gratis, tanpa akun/domain). URL-nya dicetak di log tiap start.
+// Quick Tunnel berganti URL tiap restart; matikan dengan TUNNEL=0.
+let tunnelOn = E.TUNNEL !== '0';
+const tunnelBin = path.join(home, '.opencode', 'cloudflared');
+const tunnelUrlFile = path.join(home, '.opencode', 'tunnel-url');
+
+function ensureCloudflared() {
+  try {
+    if (fs.existsSync(tunnelBin) && fs.statSync(tunnelBin).size > 1000000) return true;
+  } catch {}
+  const arch = { x64: 'amd64', arm64: 'arm64', arm: 'arm' }[process.arch] || 'amd64';
+  const url = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}`;
+  console.log(`[tunnel] mengunduh cloudflared (${arch})...`);
+  const r = spawnSync('bash', ['-c', `curl -fsSL -o "${tunnelBin}" "${url}" && chmod +x "${tunnelBin}"`], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+    env,
+  });
+  if (r.status !== 0 || !fs.existsSync(tunnelBin)) {
+    console.error('[tunnel] gagal mengunduh cloudflared — lanjut tanpa HTTPS');
+    return false;
+  }
+  return true;
+}
+
+function startTunnel(target) {
+  if (!tunnelOn) {
+    console.log('[tunnel] dinonaktifkan (TUNNEL=0)');
+    return null;
+  }
+  if (!ensureCloudflared()) {
+    tunnelOn = false;
+    return null;
+  }
+  const t = spawn(tunnelBin, ['tunnel', '--url', target, '--no-autoupdate'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env,
+  });
+  let buf = '';
+  const onLine = (chunk) => {
+    buf += chunk.toString();
+    const m = buf.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+    if (m) {
+      const u = m[0];
+      try {
+        fs.writeFileSync(tunnelUrlFile, u, { mode: 0o600 });
+      } catch {}
+      console.log(`[tunnel] HTTPS aktif: ${u}`);
+      console.log(`[tunnel] login app -> URL: ${u}  user: ${env[KU]}  pass: ${pw}`);
+      buf = '';
+    }
+  };
+  t.stdout.on('data', onLine);
+  t.stderr.on('data', onLine);
+  t.on('error', (err) => console.error('[tunnel] gagal:', err.message));
+  t.on('exit', (code) => {
+    if (tunnelOn) console.error(`[tunnel] berhenti (code=${code}) — URL mati sampai restart`);
+  });
+  return t;
+}
+
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
 // Cetak semua env yang mirip port, supaya kelihatan mana yang panel kirim.
 const envPorts = Object.keys(E)
@@ -118,13 +180,20 @@ console.log(`[start] ${bin} ${args.join(' ')}`);
 console.log(`[start] password: ${pw}   (file: ${pwFile})`);
 const child = spawn(bin, args, { stdio: 'inherit', env });
 
+// Tunnel mulai setelah server lahir; target loopback biar tidak lewat IP publik.
+const tunnel = startTunnel(`http://127.0.0.1:${port}`);
+
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
-  process.on(sig, () => child.kill(sig));
+  process.on(sig, () => {
+    if (tunnel) tunnel.kill('SIGTERM');
+    child.kill(sig);
+  });
 }
 child.on('error', (err) => {
   console.error('[start] gagal menjalankan opencode:', err.message);
   process.exit(1);
 });
 child.on('exit', (code, signal) => {
+  if (tunnel) tunnel.kill('SIGTERM');
   process.exit(code == null ? (signal ? 1 : 0) : code);
 });
