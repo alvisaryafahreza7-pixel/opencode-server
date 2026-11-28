@@ -19,17 +19,52 @@ const pw = E[KP] || E[KS] || '';
 env[KP] = pw;
 env[KS] = pw;
 
-// Cari binary: yang sudah di-install, sisa node_modules lama, atau pasang sendiri.
+// /tmp di container ini kecil, download 80MB gagal di ~80% (curl 23).
+// Pindahkan temp instal ke home, lalu buang sisa download yang menumpuk.
+const tmp = path.join(home, 'tmp');
+try {
+  fs.mkdirSync(tmp, { recursive: true });
+  env.TMPDIR = tmp;
+} catch {}
+for (const dir of ['/tmp', tmp]) {
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.startsWith('opencode_install_') || f.startsWith('opencode-install-')) {
+        fs.rmSync(path.join(dir, f), { recursive: true, force: true });
+      }
+    }
+  } catch {}
+}
+
+// Cari binary: yang sudah di-install, sisa node_modules, atau pasang sendiri.
 const candidates = [
   E.OPENCODE_BIN,
   path.join(home, '.opencode/bin/opencode'),
-  path.join(home, 'node_modules/.bin/opencode'),
   path.join(home, 'node_modules/@opencode/cli/bin/opencode.exe'),
+  path.join(home, 'node_modules/.bin/opencode'),
 ].filter(Boolean);
 
-let bin = candidates.find((p) => fs.existsSync(p));
+let bin = candidates.find((p) => {
+  try {
+    fs.accessSync(p, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 if (!bin) {
-  console.log('[start] mengunduh OpenCode (curl+tar, tanpa npm)...');
+  // Ruang dulu: sisa npm lama tidak terpakai kalau binary-nya tidak ada.
+  for (const p of [
+    path.join(home, 'node_modules'),
+    path.join(home, 'package-lock.json'),
+    path.join(home, 'node_modules/.package-lock.json'),
+  ]) {
+    try {
+      fs.rmSync(p, { recursive: true, force: true });
+    } catch {}
+  }
+  console.log('[start] mengunduh OpenCode ke', tmp, '(bukan /tmp)...');
   env.VERSION = env.VERSION || env.OPENCODE_VERSION || '2.4.2';
   const r = spawnSync(
     'bash',
@@ -37,10 +72,14 @@ if (!bin) {
     { stdio: 'inherit', env },
   );
   if (r.status !== 0) {
-    console.error('[start] gagal memasang opencode');
+    console.error('[start] gagal memasang opencode, status:', r.status);
     process.exit(1);
   }
   bin = candidates.find((p) => fs.existsSync(p)) || path.join(home, '.opencode/bin/opencode');
+  if (!fs.existsSync(bin)) {
+    console.error('[start] binary tidak ditemukan setelah instal:', bin);
+    process.exit(1);
+  }
 }
 
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
