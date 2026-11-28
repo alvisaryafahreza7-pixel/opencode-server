@@ -7,8 +7,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const home = process.env.HOME || '/home/container';
-const port = process.env.PORT || '3000';
 const E = process.env;
+
+// Port: panel Wispbyte kadang menaruh port alokasi di nama lain
+// (SERVER_PORT, PTERODACTYL_*, dll), jadi dicek beberapa kandidat.
+// Kandidat yang lebih kecil dari 1024 (mis. PORT=8080) tetap diprioritaskan
+// asal masuk akal; log dicetak supaya kelihatan mana yang dipakai.
+const portKeys = ['PORT', 'SERVER_PORT', 'ALLOC_PORT', 'PRIMARY_PORT', 'CONTAINER_PORT', 'PTERODACTYL_ALLOC_PORT'];
+const portKey = portKeys.find((k) => /^\d+$/.test(String(E[k] || '')));
+const port = portKey ? String(E[portKey]) : '3000';
 const env = { ...E };
 
 const KU = 'OPENCODE_SERVER_USERNAME';
@@ -101,6 +108,12 @@ if (!bin) {
 }
 
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
+// Cetak semua env yang mirip port, supaya kelihatan mana yang panel kirim.
+const envPorts = Object.keys(E)
+  .filter((k) => /PORT|ADDRESS|HOST|IP/i.test(k))
+  .map((k) => `${k}=${E[k]}`)
+  .join(' ');
+console.log(`[start] port env: ${envPorts || '(tidak ada)'}`);
 console.log(`[start] ${bin} ${args.join(' ')}`);
 console.log(`[start] password: ${pw}   (file: ${pwFile})`);
 const child = spawn(bin, args, { stdio: 'inherit', env });
