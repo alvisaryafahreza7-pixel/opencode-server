@@ -1,3 +1,11 @@
 .env
 data/
 *.log
+
+# Artefak runtime di .opencode/ — jangan ikut ke-repo (binary 80MB+37MB & secret)
+.opencode/bin/
+.opencode/cloudflared
+.opencode/server-password
+.opencode/tunnel-url
+.opencode/tmp/
+node_modules/
