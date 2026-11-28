@@ -1,5 +1,13 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "parallel": {
+        "type": "remote",
+        "url": "https://mcp.parallel.ai/mcp"
+      }
+    }
+  },
   "permissions": [
     { "action": "*", "resource": "*", "effect": "allow" },
     { "action": "read", "resource": "*.env", "effect": "deny" },
