@@ -133,15 +133,28 @@ function ensureCloudflared() {
   return true;
 }
 
-function startTunnel(target) {
-  if (!tunnelOn) {
-    console.log('[tunnel] dinonaktifkan (TUNNEL=0)');
-    return null;
-  }
-  if (!ensureCloudflared()) {
-    tunnelOn = false;
-    return null;
-  }
+// Supervisor: tunnel yang mati sendiri (putus jaringan, Cloudflare rotate, crash)
+// langsung dihidupkan lagi dengan jeda berjenjang. Quick Tunnel selalu dapat URL
+// baru tiap hidup ulang — URL-nya dicetak tiap kali supaya gampang diupdate di app.
+let tunnelChild = null;
+let tunnelUrl = '';
+let restartTimer = null;
+let restartDelay = 5000;
+const RESTART_MAX = 60000; // jeda maksimal 60 detik
+
+function reportUrl(u) {
+  if (u === tunnelUrl) return;
+  const isNew = tunnelUrl !== '';
+  tunnelUrl = u;
+  try {
+    fs.writeFileSync(tunnelUrlFile, u, { mode: 0o600 });
+  } catch {}
+  console.log(`[tunnel] HTTPS aktif: ${u}`);
+  if (isNew) console.log(`[tunnel] URL BERUBAH — update di app: ${u}`);
+  console.log(`[tunnel] login app -> URL: ${u}  user: ${env[KU]}  pass: ${pw}`);
+}
+
+function spawnTunnel(target) {
   const t = spawn(tunnelBin, ['tunnel', '--url', target, '--no-autoupdate'], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env,
@@ -151,22 +164,43 @@ function startTunnel(target) {
     buf += chunk.toString();
     const m = buf.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
     if (m) {
-      const u = m[0];
-      try {
-        fs.writeFileSync(tunnelUrlFile, u, { mode: 0o600 });
-      } catch {}
-      console.log(`[tunnel] HTTPS aktif: ${u}`);
-      console.log(`[tunnel] login app -> URL: ${u}  user: ${env[KU]}  pass: ${pw}`);
+      reportUrl(m[0]);
+      restartDelay = 5000; // berhasil dapat URL → reset backoff
       buf = '';
     }
   };
   t.stdout.on('data', onLine);
   t.stderr.on('data', onLine);
-  t.on('error', (err) => console.error('[tunnel] gagal:', err.message));
-  t.on('exit', (code) => {
-    if (tunnelOn) console.error(`[tunnel] berhenti (code=${code}) — URL mati sampai restart`);
+  t.on('error', (err) => console.error('[tunnel] gagal spawn:', err.message));
+  t.on('exit', (code, signal) => {
+    if (tunnelChild === t) tunnelChild = null;
+    if (!tunnelOn) return;
+    console.error(`[tunnel] putus (code=${code}${signal ? `, ${signal}` : ''}) — coba lagi dalam ${Math.round(restartDelay / 1000)}s`);
+    restartTimer = setTimeout(() => {
+      if (tunnelOn) spawnTunnel(target);
+    }, restartDelay);
+    restartDelay = Math.min(restartDelay * 2, RESTART_MAX);
   });
+  tunnelChild = t;
   return t;
+}
+
+function startTunnel(target) {
+  if (!tunnelOn) {
+    console.log('[tunnel] dinonaktifkan (TUNNEL=0)');
+    return null;
+  }
+  if (!ensureCloudflared()) {
+    tunnelOn = false;
+    return null;
+  }
+  return spawnTunnel(target);
+}
+
+function stopTunnel() {
+  tunnelOn = false;
+  if (restartTimer) clearTimeout(restartTimer);
+  if (tunnelChild) tunnelChild.kill('SIGTERM');
 }
 
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
@@ -181,11 +215,11 @@ console.log(`[start] password: ${pw}   (file: ${pwFile})`);
 const child = spawn(bin, args, { stdio: 'inherit', env });
 
 // Tunnel mulai setelah server lahir; target loopback biar tidak lewat IP publik.
-const tunnel = startTunnel(`http://127.0.0.1:${port}`);
+startTunnel(`http://127.0.0.1:${port}`);
 
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
   process.on(sig, () => {
-    if (tunnel) tunnel.kill('SIGTERM');
+    stopTunnel();
     child.kill(sig);
   });
 }
@@ -194,6 +228,6 @@ child.on('error', (err) => {
   process.exit(1);
 });
 child.on('exit', (code, signal) => {
-  if (tunnel) tunnel.kill('SIGTERM');
+  stopTunnel();
   process.exit(code == null ? (signal ? 1 : 0) : code);
 });
