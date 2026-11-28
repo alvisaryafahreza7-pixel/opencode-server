@@ -1,7 +1,8 @@
 // Entry point untuk Wispbyte: node /home/container/${JS_FILE}
-// Catatan: panel Wispbyte mengganti teks mirip "PASSWORD=..." jadi ••• saat menyimpan,
-// jadi nama env diakses lewat variabel, bukan literal `X=`.
+// Catatan: panel Wispbyte mengganti teks mirip "NAMA=nilai" jadi titik-titik saat menyimpan,
+// jadi nama env diakses lewat variabel, bukan literal dengan tanda sama-dengan.
 const { spawn, spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -14,8 +15,26 @@ const KU = 'OPENCODE_SERVER_USERNAME';
 const KP = 'OPENCODE_PASSWORD';
 const KS = 'OPENCODE_SERVER_PASSWORD';
 
+// Password: env kalau panel benar-benar mengirimnya, kalau tidak pakai file
+// supaya tetap sama tiap restart (tanpa env, OpenCode bikin acak tiap boot).
+const pwFile = path.join(home, '.opencode', 'server-password');
+let pw = E[KP] || E[KS] || '';
+if (!pw) {
+  try {
+    pw = fs.readFileSync(pwFile, 'utf8').trim();
+  } catch {}
+}
+if (!pw) {
+  pw = crypto.randomBytes(36).toString('base64url');
+  try {
+    fs.mkdirSync(path.dirname(pwFile), { recursive: true });
+    fs.writeFileSync(pwFile, pw, { mode: 0o600 });
+  } catch (err) {
+    console.error('[start] peringatan: tidak bisa menyimpan password:', err.message);
+  }
+}
+
 env[KU] = env[KU] || 'opencode';
-const pw = E[KP] || E[KS] || '';
 env[KP] = pw;
 env[KS] = pw;
 
@@ -54,7 +73,6 @@ let bin = candidates.find((p) => {
 });
 
 if (!bin) {
-  // Ruang dulu: sisa npm lama tidak terpakai kalau binary-nya tidak ada.
   for (const p of [
     path.join(home, 'node_modules'),
     path.join(home, 'package-lock.json'),
@@ -84,6 +102,7 @@ if (!bin) {
 
 const args = ['serve', '--hostname', '0.0.0.0', '--port', String(port)];
 console.log(`[start] ${bin} ${args.join(' ')}`);
+console.log(`[start] password: ${pw}   (file: ${pwFile})`);
 const child = spawn(bin, args, { stdio: 'inherit', env });
 
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
